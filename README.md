@@ -38,11 +38,10 @@ We implement this in Hugging Face, with modifications to the original `src/trans
 
 ```
 python probe.py \
-    --infile /scratch/tkew/ctrl_tokens/resources/data/en/aligned/asset_test.tsv \
+    --infile /scratch/tkew/ctrl_tokens/resources/data/examples.en \
     --model_path resources/models/muss_en_mined_hf/ \
     --do_train --do_eval --do_predict \
     --early_stopping \
-    --wandb \
     --encoder_layers 6 \
     --decoder_layers 0 \
     --aggregate_embeddings 'avg'

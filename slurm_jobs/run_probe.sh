@@ -1,12 +1,12 @@
 #!/bin/bash
 #SBATCH --time=24:00:00
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=16G
-#SBATCH --gres=gpu:Tesla-V100-32GB:1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem-per-cpu=128G
+#SBATCH --gres=gpu:1
 #SBATCH --partition=volta
 #SBATCH --output=/data/tkew/projects/ctrl_tokens/logs/%j.out
 
-# Author: T. Kew / N. Spring
+# Author: T. Kew (inspired by N. Spring)
 # sbatch jobs/run_probe.sh -e -1 -d 0
 
 #######################################################################
@@ -14,7 +14,7 @@
 #######################################################################
 
 base="/data/tkew/projects/ctrl_tokens"
-infile="/scratch/tkew/ctrl_tokens/resources/data/en/aligned/asset_test.tsv" # default
+infile="$base/resources/data/en/aligned/asset_test.tsv" # default
 model_path="$base/resources/models/muss_en_mined_hf/"
 agg_method="def"
 encoder_layers=""

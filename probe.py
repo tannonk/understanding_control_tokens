@@ -150,9 +150,9 @@ def train_classifier_layer(model, tokenizer, dataset, args):
 
         if args.ctrl_token is None: # assumes all 4 distinct control tokens are being evaluated
             # the order is defined in utils.py as 'len_ratio', 'lev_sim', 'word_rank', 'tree_depth'
-            # TODO remove hardcoded value of 5 - should be ~ labels.shape[1] // 4
-            logits = np.expand_dims(logits, axis=1).reshape(-1, 4, 5)
-            labels = np.expand_dims(labels, axis=1).reshape(-1, 4, 5)
+            # labels.shape[1] // 4 --> number of values per control token
+            logits = np.expand_dims(logits, axis=1).reshape(-1, 4, labels.shape[1] // 4)
+            labels = np.expand_dims(labels, axis=1).reshape(-1, 4, labels.shape[1] // 4)
             prediction_probs = softmax(logits, axis=-1)            
             for i, param in enumerate(['len_ratio', 'lev_sim', 'word_rank', 'tree_depth']):
                 acc_scores[f'acc:{param}'] = acc.compute(
@@ -190,7 +190,7 @@ def train_classifier_layer(model, tokenizer, dataset, args):
         wandb.init(
             project="ctrl_tokens_probe", 
             name=model_name,
-            tags=[tgt_ctrl_token, sentence_representation, active_enc_layers_str, active_dec_layers_str],
+            tags=[tgt_ctrl_token, sentence_representation, f'{active_enc_layers_str}-{active_dec_layers_str}'],
             group=sentence_representation
             )
 
@@ -207,7 +207,7 @@ def train_classifier_layer(model, tokenizer, dataset, args):
         warmup_steps=0,
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
-        eval_accumulation_steps=6,
+        eval_accumulation_steps=2,
         gradient_accumulation_steps=1,
         load_best_model_at_end=True,
         metric_for_best_model="loss",

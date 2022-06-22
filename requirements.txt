@@ -1,7 +1,10 @@
 bertviz
+datasets==2.3.0
 ipywidgets
+gpustat
 jupyterlab
 transformers
 nltk==3.7
 matplotlib==3.5.2
 seaborn==0.11.2
+shap==0.40.0

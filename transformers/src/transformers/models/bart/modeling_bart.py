@@ -821,6 +821,15 @@ class BartEncoder(BartPretrainedModel):
                 )
 
         for idx, encoder_layer in enumerate(self.layers):
+
+            ########### ADDED BY T. KEW #############
+            # if self.config.__dict__.get('active_enc_layers', None) and not self.config.active_enc_layers[idx]:
+            # breakpoint()
+            if 'active_enc_layers' in self.config.to_dict() and idx >= self.config.active_enc_layers:
+                # print(f'Skipping encoder layer {idx}...')
+                continue
+            ##########################################
+
             if output_hidden_states:
                 encoder_states = encoder_states + (hidden_states,)
             # add LayerDrop (see https://arxiv.org/abs/1909.11556 for description)
@@ -1059,6 +1068,15 @@ class BartDecoder(BartPretrainedModel):
                     )
 
         for idx, decoder_layer in enumerate(self.layers):
+
+            ########### ADDED BY T. KEW #############
+            # if self.config.__dict__.get('active_dec_layers', None) and not self.config.active_dec_layers[idx]:
+            # breakpoint()
+            if 'active_dec_layers' in self.config.to_dict() and idx >= self.config.active_dec_layers:
+                # print(f'Skipping decoder layer {idx}...')
+                continue
+            ##########################################
+
             # add LayerDrop (see https://arxiv.org/abs/1909.11556 for description)
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
@@ -1509,15 +1527,37 @@ class BartForSequenceClassification(BartPretrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
+
         hidden_states = outputs[0]  # last hidden state
+
+        ### ADDED BY T. KEW ###
+        if 'active_enc_layers' in self.config.to_dict() and 'active_dec_layers' in self.config.to_dict() and outputs.encoder_hidden_states is not None:
+            # if active_enc_layers == 0 and active_dec_layers == 0 --> output of embedding layer i.e. 0
+            if self.config.active_dec_layers == 0: # will return one of the encoder hidden layers
+                # return idx layer's hidden state corresponding to the # of active encoder layers,
+                # e.g. 0 == embedding layer, 12 == last encoder layer
+                hidden_states = outputs.encoder_hidden_states[self.config.active_enc_layers]
+                # note, this is equal to outputs.encoder_last_hidden_state
+            else:
+                hidden_states = outputs.decoder_hidden_states[self.config.active_dec_layers]
+                # if layers are skipped according to the number of active decoder layers, 
+                # outputs.decoder_hidden_states[self.config.active_dec_layers] is equal to last_hidden_state, i.e. outputs[0]
+        #######################
 
         eos_mask = input_ids.eq(self.config.eos_token_id)
 
         if len(torch.unique_consecutive(eos_mask.sum(1))) > 1:
             raise ValueError("All examples must have the same number of <eos> tokens.")
-        sentence_representation = hidden_states[eos_mask, :].view(hidden_states.size(0), -1, hidden_states.size(-1))[
-            :, -1, :
-        ]
+        
+        # hidden_states.shape = [B x S x H]
+        # sentence_representation.shape = [B x H]
+        if self.config.to_dict().get('average_embeddings', None):
+            sentence_representation = hidden_states.mean(dim=1)
+        else:
+            sentence_representation = hidden_states[eos_mask, :].view(hidden_states.size(0), -1, hidden_states.size(-1))[
+                :, -1, :
+            ]
+
         logits = self.classification_head(sentence_representation)
 
         loss = None

@@ -17,7 +17,7 @@ python -m spacy download en_core_web_md
 
 `#TODO`
 
-## Converting pretrained ACCESS models to Hugging Face
+## Converting pretrained ACCESS/MUSS models to Hugging Face
 
 To facilitate analysing attention weights, we convert the models trained with Fairseq to Hugging Face. This allows us to easily inspect attention weights with off-the-shelf tools such as `bertviz`.
 
@@ -50,6 +50,16 @@ python probe.py \
 Alternatively, to submit a job run with slurm:
 
 ```
-sbatch run_probe.sh -e 6 -d 0 -a avg
+sbatch slurm_jobs/run_probe.sh -e 6 -d 0 -a avg
 ```
+
+Evaluating a probe on the test set should happen automatically once training is complete. However, to do this manually (i.e. post hoc), specify the existing model's directory as `--model_path`, e.g.:
+
+```
+python probe.py \
+    --infile /scratch/tkew/ctrl_tokens/resources/data/examples.en \
+    --model_path resources/models/classifiers/muss_en_mined_hf-all-avg-111111000000-000000000000 \
+    --do_eval --do_predict
+```
+
 

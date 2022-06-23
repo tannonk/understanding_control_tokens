@@ -5,9 +5,24 @@
 
 Example Usages:
 
-    python probe.py --seed 42 --step_size 0.25 --range_min 0.25 --range_max 1.5 --aggregate_embeddings 'def'
+    Training:
+        python probe.py \
+            --infile resources/data/examples.en \
+            --model_path resources/models/muss_en_mined_hf/ \
+            --do_train --do_eval --do_predict \
+            --early_stopping \
+            --encoder_layers 6 \
+            --decoder_layers 0 \
+            --aggregate_embeddings 'avg'
 
-This script implements a simple probe for the BART model.
+    Evaluation:
+        python probe.py \
+        --infile resources/data/examples.en \
+        --model_path resources/models/classifiers/muss_en_mined_hf-all-avg-111111000000-000000000000 \
+        --do_eval --do_predict
+
+
+This script implements a simple layer-specific probe for the BART model.
 
 We use the classifcation head from huggingface to predict the parameter value of a control token.
 

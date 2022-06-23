@@ -20,6 +20,7 @@ Makes use of the following changes to the BART model:
 
 
 import os
+import re
 import random
 import logging
 import argparse
@@ -45,6 +46,7 @@ from transformers import (
     Trainer,
     )
 from transformers.trainer_callback import EarlyStoppingCallback
+from transformers.trainer_utils import get_last_checkpoint
 
 logging.basicConfig(
         format='%(asctime)s | %(levelname)s | %(name)s | %(message)s',
@@ -136,9 +138,92 @@ def construct_dataset(inputs, labels, seed, use_one_hot=False):
     
     return train_test_valid_dataset
 
+def main(args):
 
-def train_classifier_layer(model, tokenizer, dataset, args):
+    seed_everything(args.seed)
 
+    if args.debug:
+        os.environ["WANDB_DISABLED"] = "true"
+
+    # if args.wandb and not args.debug:
+    #     wandb.init(project="ctrl_tokens_probe")
+
+    logger = logging.getLogger(__name__)
+
+    device = args.device #'cuda' if torch.cuda.is_available() else 'cpu'
+    infile = args.infile # 'resources/data/examples.en'
+    model_path = args.model_path # "facebook/bart-base"
+
+    # build dataset
+    sentences = read_lines(infile)
+
+    if args.ctrl_token:
+        inputs, labels = construct_single_label_dataset(sentences, args.ctrl_token, args.range_min, args.range_max, args.step_size)
+        dataset = construct_dataset(inputs, labels, seed=args.seed, use_one_hot=True)
+    else:
+        inputs, labels = construct_multi_label_dataset(sentences, args.range_min, args.range_max, args.step_size)
+        dataset = construct_dataset(inputs, labels, seed=args.seed, use_one_hot=False)
+    
+
+    #### prepare model for experiments
+    if len(dataset['train']['labels'][0]) > 1:
+        num_labels = len(dataset['train']['labels'][0]) # if labels are 1-hot encoded
+    else:
+        num_labels = len(set([i[0] for i in dataset['train']['labels']])) # if labels are categorical
+    
+    breakpoint()
+    try:
+        tokenizer = BartTokenizer.from_pretrained(model_path)
+        model = BartForSequenceClassification.from_pretrained(model_path, num_labels=num_labels, output_hidden_states=True)
+    except OSError: # earlier models were only saved as checkpoints, so try to retrieve the checkpoint
+        if Path(model_path).exists() and not args.do_train:
+            # load model checkpoint if only running evaluation or prediction (i.e. not training a new model)
+            # detecting last checkpoint and load model from it
+            model_path = get_last_checkpoint(args.model_path)
+        tokenizer = BartTokenizer.from_pretrained(model_path)
+        model = BartForSequenceClassification.from_pretrained(model_path, num_labels=num_labels, output_hidden_states=True)
+
+    logger.info(f'Loaded {model_path} on {model.device}...')
+
+    for name, param in model.named_parameters():
+        if not name.startswith("classification"): # choose whatever you like here
+            logger.info(f'Freezing parameter: {name}')
+            param.requires_grad = False
+        else:
+            logger.info(f'*** {name} parameter weights will be trained! ***')
+
+    # ensure that dropout is not used while training the classifier head
+    model.config.dropout = 0.0
+    model.config.attention_dropout = 0.0
+
+    if args.aggregate_embeddings == 'avg':
+        model.config.average_embeddings = True
+        logger.info('*** Note, hidden states will be averaged to compute the sentence representation ***')
+    else:
+        model.config.average_embeddings = False
+
+    # infer the number of active encoder and decoder layers from the model name
+    if not 'active_enc_layers' in model.config.to_dict():
+        if args.encoder_layers == -1: # all available layers are active, e.g. 12 for bart-large
+            model.config.active_enc_layers = model.config.encoder_layers
+        else:
+            model.config.active_enc_layers = args.encoder_layers
+    if not 'active_dec_layers' in model.config.to_dict():
+        if args.decoder_layers == -1: # all available layers are active, e.g. 12 for bart-large
+            model.config.active_dec_layers = model.config.decoder_layers
+        else:
+            model.config.active_dec_layers = args.decoder_layers
+
+    # check validitiy
+    if model.config.active_dec_layers > 0 and model.config.active_enc_layers < 12:
+        raise RuntimeError('Layers are not contiguous! All encoder layers must be active if decoder layers are active.')
+    
+    # https://github.com/huggingface/notebooks/blob/main/examples/text_classification.ipynb    
+    def preprocess_function(examples):
+        return tokenizer(examples['text'], max_length=512, truncation=True)
+    
+    dataset = dataset.map(preprocess_function, batched=True) #, num_proc=args.num_workers)
+    
     acc = load_metric("accuracy")
     
     def compute_metrics(eval_pred):
@@ -168,7 +253,10 @@ def train_classifier_layer(model, tokenizer, dataset, args):
         return acc_scores
 
     model_name = Path(model.config._name_or_path).stem
-    
+    # when not training, the model_name corresponds to a trained checkpoint, so get the true model_name from one step up.
+    if model_name.startswith('checkpoint'):
+        model_name = Path(model.config._name_or_path).parts[-2]
+
     active_enc_layers_str = ''.join(['1' if i < model.config.active_enc_layers and model.config.active_enc_layers != 0 else '0' for i in range(model.config.encoder_layers)])
     active_dec_layers_str = ''.join(['1' if i < model.config.active_dec_layers and model.config.active_dec_layers != 0 else '0' for i in range(model.config.decoder_layers)])    
     
@@ -176,9 +264,9 @@ def train_classifier_layer(model, tokenizer, dataset, args):
 
     tgt_ctrl_token = 'all' if not args.ctrl_token else args.ctrl_token
 
-    model_name = f'{model_name}-{tgt_ctrl_token}-{sentence_representation}-{active_enc_layers_str}-{active_dec_layers_str}'
-
-    print(f'*** Running model: {model_name} ***')
+    # if the model_name is inferred from a checkpoint, the model_name should contain identifying values
+    if tgt_ctrl_token not in model_name and sentence_representation not in model_name and active_enc_layers_str not in model_name and active_dec_layers_str not in model_name:
+        model_name = f'{model_name}-{tgt_ctrl_token}-{sentence_representation}-{active_enc_layers_str}-{active_dec_layers_str}'
 
     output_dir = Path(args.output_dir) / model_name
 
@@ -190,13 +278,13 @@ def train_classifier_layer(model, tokenizer, dataset, args):
         wandb.init(
             project="ctrl_tokens_probe", 
             name=model_name,
-            tags=[tgt_ctrl_token, sentence_representation, f'{active_enc_layers_str}-{active_dec_layers_str}'],
+            tags=[tgt_ctrl_token, sentence_representation, f'{active_enc_layers_str}-{active_dec_layers_str}', args.infile.split('/')[-1]],
             group=sentence_representation
             )
 
     training_args = TrainingArguments(
         output_dir,
-        overwrite_output_dir=True,
+        overwrite_output_dir=True if args.do_train else False, # if not training, only running evaluaton so don't overwrite!
         run_name=model_name,
         evaluation_strategy="epoch",
         save_strategy="epoch",
@@ -231,94 +319,36 @@ def train_classifier_layer(model, tokenizer, dataset, args):
     )   
 
     if args.do_train:
-        # breakpoint()
-        trainer.train()
-    
+        logger.info(f'*** Training {model_name} ***')
+        train_result = trainer.train()
+        metrics = train_result.metrics
+        metrics['train_data'] = args.infile
+        metrics['train_samples'] = len(dataset["train"])
+        trainer.log_metrics("train", metrics)
+        trainer.save_metrics("train", metrics)
+
+        trainer.save_model()  # Saves the tokenizer too for easy upload
+        trainer.save_state()
+
     if args.do_eval:
-        trainer.evaluate()
+        logger.info(f'*** Evaluating {model_name} on validation set ***')
+        eval_result = trainer.evaluate(eval_dataset=dataset['valid'])
+        metrics = eval_result
+        metrics['eval_data'] = args.infile
+        metrics['eval_samples'] = len(dataset["valid"])
+        trainer.log_metrics("eval", metrics)
+        trainer.save_metrics("eval", metrics)
 
     if args.do_predict:
-        trainer.predict(test_dataset=dataset["test"])
+        logger.info(f'*** Evaluating {model_name} on test set ***')
+        predict_results = trainer.predict(test_dataset=dataset["test"])
+        metrics = predict_results.metrics
+        metrics['test_data'] = args.infile
+        metrics['test_samples'] = len(dataset["test"])
+        trainer.log_metrics("test", metrics)
+        trainer.save_metrics("test", metrics)
 
     return 
-    
-
-def main(args):
-
-    seed_everything(args.seed)
-
-    if args.debug:
-        os.environ["WANDB_DISABLED"] = "true"
-
-    # if args.wandb and not args.debug:
-    #     wandb.init(project="ctrl_tokens_probe")
-
-    logger = logging.getLogger(__name__)
-
-    device = args.device #'cuda' if torch.cuda.is_available() else 'cpu'
-    infile = args.infile # 'resources/data/examples.en'
-    model_path = args.model_path # "facebook/bart-base"
-
-    # build dataset
-    sentences = read_lines(infile)
-
-    if args.ctrl_token:
-        inputs, labels = construct_single_label_dataset(sentences, args.ctrl_token, args.range_min, args.range_max, args.step_size)
-        dataset = construct_dataset(inputs, labels, seed=args.seed, use_one_hot=True)
-    else:
-        inputs, labels = construct_multi_label_dataset(sentences, args.range_min, args.range_max, args.step_size)
-        dataset = construct_dataset(inputs, labels, seed=args.seed, use_one_hot=False)
-    
-
-    #### prepare model for experiments
-    if len(dataset['train']['labels'][0]) > 1:
-        num_labels = len(dataset['train']['labels'][0]) # if labels are 1-hot encoded
-    else:
-        num_labels = len(set([i[0] for i in dataset['train']['labels']])) # if labels are categorical
-
-    tokenizer = BartTokenizer.from_pretrained(model_path)
-    model = BartForSequenceClassification.from_pretrained(model_path, num_labels=num_labels, output_hidden_states=True)
-
-    logger.info(f'Loaded {model_path} on {model.device}...')
-
-    for name, param in model.named_parameters():
-        if not name.startswith("classification"): # choose whatever you like here
-            logger.info(f'Freezing parameter: {name}')
-            param.requires_grad = False
-        else:
-            logger.info(f'*** {name} parameter weights will be trained! ***')
-
-    # ensure that dropout is not used while training the classifier head
-    model.config.dropout = 0.0
-    model.config.attention_dropout = 0.0
-
-    if args.aggregate_embeddings == 'avg':
-        model.config.average_embeddings = True
-        logger.info('*** Note, hidden states will be averaged to compute the sentence representation ***')
-    else:
-        model.config.average_embeddings = False
-
-    if args.encoder_layers == -1: # all available layers are active, e.g. 12 for bart-large
-        model.config.active_enc_layers = model.config.encoder_layers
-    else:
-        model.config.active_enc_layers = args.encoder_layers
-
-    if args.decoder_layers == -1: # all available layers are active, e.g. 12 for bart-large
-        model.config.active_dec_layers = model.config.decoder_layers
-    else:
-        model.config.active_dec_layers = args.decoder_layers
-
-    # check validitiy
-    if model.config.active_dec_layers > 0 and model.config.active_enc_layers < 12:
-        raise RuntimeError('Layers are not contiguous! All encoder layers must be active if decoder layers are active.')
-    
-    # https://github.com/huggingface/notebooks/blob/main/examples/text_classification.ipynb    
-    def preprocess_function(examples):
-        return tokenizer(examples['text'], max_length=512, truncation=True)
-    
-    dataset = dataset.map(preprocess_function, batched=True) #, num_proc=args.num_workers)
-    # breakpoint()
-    train_classifier_layer(model, tokenizer, dataset, args)
 
 if __name__ == "__main__":
     args = parse_args()

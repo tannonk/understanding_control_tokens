@@ -1552,6 +1552,8 @@ class BartForSequenceClassification(BartPretrainedModel):
         # hidden_states.shape = [B x S x H]
         # sentence_representation.shape = [B x H]
         if self.config.to_dict().get('average_embeddings', None):
+            pad_mask = input_ids.eq(self.config.pad_token_id)
+            hidden_states[pad_mask] = 0 # set pad token positions to 0
             sentence_representation = hidden_states.mean(dim=1)
         else:
             sentence_representation = hidden_states[eos_mask, :].view(hidden_states.size(0), -1, hidden_states.size(-1))[

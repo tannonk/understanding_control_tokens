@@ -1,0 +1,17 @@
+click
+matplotlib
+nltk>=3.6.5
+numpy
+pandas
+requests>=2.21.0
+sacrebleu>=2.0.0
+sacremoses
+seaborn
+sklearn
+stanfordnlp
+tqdm>=4.32.2
+yattag
+plotly>=4.0.0
+bert_score
+tseval@ git+https://github.com/facebookresearch/text-simplification-evaluation.git@main
+simalign

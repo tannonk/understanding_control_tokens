@@ -1,0 +1,2 @@
+recursive-include easse/resources/data *
+prune **/system_outputs/**

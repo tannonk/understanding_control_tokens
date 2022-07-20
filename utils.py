@@ -6,9 +6,11 @@
 from string import Template
 import numpy as np
 from typing import List, Tuple, Dict, Optional
+import torch
 from torch import Tensor
 from tqdm import tqdm
 from itertools import combinations
+import re
 # import warnings
 
 ctrl1 = Template('<DEPENDENCYTREEDEPTHRATIO_${tree_depth}>')
@@ -35,12 +37,12 @@ def construct_input_for_access(src: str, params: Dict) -> str:
     
     return input_string
 
-# def check_uniqueness(batch: Tensor) -> None:
-#     '''compares all encoded tensors in a batch'''
-#     for a, b in combinations(batch, 2):
-#         if all(torch.eq(a, b)):
-#             raise warnings.warn('Tensors in batch are expected to be different but found equality.')
-#     return
+def check_uniqueness(batch: Tensor) -> None:
+    '''compares all encoded tensors in a batch'''
+    for a, b in combinations(batch, 2):
+        if all(torch.eq(a, b)):
+            raise warnings.warn('Tensors in batch are expected to be different but found equality.')
+    return
 
 def batch(iterable: List[str], n: int = 5):
     '''batching generator'''
@@ -55,7 +57,7 @@ def generate(sentences: List[str], model, tokenizer):
     outputs_ids = model.generate(
         input_ids["input_ids"], 
         num_beams=5, 
-        max_length=20)
+        max_length=128)
     outputs = tokenizer.batch_decode(outputs_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
     return outputs
     

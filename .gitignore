@@ -165,3 +165,6 @@ Untitled*.ipynb
 ._*.py
 *.pt
 wandb/
+
+.DS_Store
+._.DS_Store

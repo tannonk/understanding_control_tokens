@@ -35,7 +35,6 @@ Makes use of the following changes to the BART model:
 
 
 import os
-import re
 import random
 import logging
 import argparse
@@ -73,7 +72,7 @@ def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser()
     ap.add_argument('--infile', required=False, default='resources/data/examples.en', help='')
     ap.add_argument('--model_path', required=False, default='facebook/bart-base', help='')
-    ap.add_argument('--output_dir', required=False, default='resources/models/classifiers', help='')
+    ap.add_argument('--output_dir', required=False, default='resources/models/classifiers/dummy', help='')
     ap.add_argument('--device', required=False, default='cuda', help='')
     
     ap.add_argument('--ctrl_token', required=False, 
@@ -186,7 +185,6 @@ def main(args):
     else:
         num_labels = len(set([i[0] for i in dataset['train']['labels']])) # if labels are categorical
     
-    breakpoint()
     try:
         tokenizer = BartTokenizer.from_pretrained(model_path)
         model = BartForSequenceClassification.from_pretrained(model_path, num_labels=num_labels, output_hidden_states=True)

@@ -94,23 +94,7 @@ def generate(sentences: List[str], model, tokenizer):
 
 #     return avg_edit_dist / avg_ref_len
 
-def strip_params(src_text: str) -> str:
-    """
-    returns the original src text
-    """
-    src_text = ' '.join(src_text.split()[4:]).strip()
-    return src_text
-    
-def parse_params(src_text: str) -> Dict:
-    """returns the parameters from a source text as a dict"""
-    params = {
-        'len_ratio': float(re.search('<LENGTHRATIO_(\d\.\d+)>', src_text).groups(1)[0]),
-        'lev_sim': float(re.search('<REPLACEONLYLEVENSHTEIN_(\d\.\d+)>', src_text).groups(1)[0]),
-        'word_rank': float(re.search('<WORDRANKRATIO_(\d\.\d+)>', src_text).groups(1)[0]),
-        'tree_depth': float(re.search('<DEPENDENCYTREEDEPTHRATIO_(\d\.\d+)>', src_text).groups(1)[0]),
-        }
-    
-    return params
+
 
 def encode_params(params, range_min, range_max, step_size):
     values = list(np.arange(range_min, range_max, step_size))
@@ -197,7 +181,7 @@ def construct_multi_label_dataset(
     return inputs, labels
 
 if __name__ == "__main__":
-    sentences = read_lines('/net/cephfs/scratch/tkew/ctrl_tokens/resources/data/examples.en')
+    sentences = read_lines('/scratch/tkew/ctrl_tokens/resources/data/examples.en')
     sentences, labels = construct_multi_label_dataset(sentences, 0.25, 1.5, 0.25) # results in 625 examples per sentence!
     for s in sentences[:625]:
         print(s)

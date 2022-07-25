@@ -1,34 +1,69 @@
 # Influence of prefix tokens for controlled text generation
 
+This project aims to better understand the influence of control tokens when applied to sentence simplification. Specifically, we analyse the MUSS model proposed by [Martin et al. (2021)](https://arxiv.org/abs/2005.00352) which is trained on English paraphrase data mined from the web.
+
+This model relies on the ACCESS control method which was proposed in [Martin et al. (2020)](https://aclanthology.org/2020.lrec-1.577/).
+
+Both the ACCESS and MUSS models use four consecutive control tokens prepended to the source text in order to control aspects of the generation. 
+
+This rather simple approach has a couple of shortcomings:
+    1. it is not clear to what extent the control tokens actually steer the generation process (e.g. do all control tokens contribute to a simplification or is one just doing the heavy lifting or are there interaction effects that cancel out control tokens, or worse, work against each other)
+    2. given an input sentence to simplify, how do we choose the most suitable control token values for good results
+
+This readme provides some descriptive information for running our experiments.
+
+This Google Slides [https://docs.google.com/presentation/d/1gBmOx5T8p2UkWpOefZFMjsyJhl5OZ3N4ERV5A_pX4OE/edit?usp=sharing](presentation) contains a brief overview of background descriptions and preliminary results.
+
+
 ## Setup
 
+NOTE: To run ALTI+, you need Fairseq v0.12.1, while MUSS models uses Fairseq v0.10.2. The easiest way to set this up and avoid dependency issues is t run two separate environments, e.g.
+
 ```
-conda create -n env python=3.8
-conda activate env
-pip install -r requirements.txt
+# for main experiments
+conda create -n ctrl_tokens python=3.8
+conda activate ctrl_tokens
+pip install -r envs/ctrl_tokens_requirements.txt
 
-git clone git@github.com:facebookresearch/muss.git
-cd muss/
-pip install -e .  # Install package
-python -m spacy download en_core_web_md
+# for attention analyses
+conda create -n alti_plus python=3.8
+conda activate alti_plus
+pip install -r envs/alti_plus_requirements.txt
 ```
+Alternatively, could also try a single env (at own risk). Upgrading Fairseq doesn't seem to cause any issues when running inference with MUSS, however, this has not been thoroughly tested.
 
-## ACCESS
+```
+conda create -n ctrl_tokens_v2 python=3.8
+conda activate ctrl_tokens_v2
+pip install -r envs/alti_plus_requirements.txt
+pip install -r envs/ctrl_tokens_requirements.txt
 
-`#TODO`
+```
 
 ## Converting pretrained ACCESS/MUSS models to Hugging Face
 
-To facilitate analysing attention weights, we convert the models trained with Fairseq to Hugging Face. This allows us to easily inspect attention weights with off-the-shelf tools such as `bertviz`.
+To facilitate some of our analyses, we convert the models trained with Fairseq to Hugging Face. This allows us to easily build probing models and inspect attention weights with off-the-shelf tools such as `bertviz`.
 
 ```
-python custom_scripts/convert_bart_original_pytorch_checkpoint_to_pytorch.py \
+python muss/custom_scripts/convert_bart_original_pytorch_checkpoint_to_pytorch.py \
     resources/models/muss_en_mined/model.pt \
     resources/models/muss_en_mined_hf \
     --hf_config facebook/bart-large-cnn
 ```
 
-## Probing Experiments
+## Surface-level Analysis
+
+The most obvious way to inspect the effect of the control tokens is to generate simplifications with a range of possible values and look at the generated outputs.
+
+We do this with both in-distribution and out-of-distribution control token values. If the control tokens do their job, we would expect to see the attributes of the generated outputs to reflect (or correlate strongly) with the specified values given as input to the model.
+
+To run these experiments, we provide the notebook [./notebooks/surface_level_analysis.ipynb](surface_level_analysis.ipynb) in which we construct a large inference dataset with input sentences hardcoded with a range of possible control token values and then generate simplifications using our Hugging Face ported model.
+
+The correlation heatmaps in [./results/plots/] show that the correlation for in-domain parameter values and output attributes is low (~0.3) for three out of the four control tokens. This is similar to the preliminary results gained by Iza Škrjanec.
+
+## Model Analysis
+
+### Probing Experiments
 
 To see if the model retains the information provided by the control tokens, we probe various hidden layer states with a classifier.
 
@@ -62,4 +97,27 @@ python probe.py \
     --do_eval --do_predict
 ```
 
+### Attention Analysis
 
+To analyse the contribution of control tokens via attention weights, we use the method proposed by [Ferrando et al. (2022)](https://arxiv.org/abs/2203.04212) called **ALTI+**.
+
+The notebook [./transformer-contributions-nmt/muss_interprebility.ipynb] can be used to analyse attention weights in the custom BART model trained with Fairseq. 
+
+
+## Author
+
+Tannon Kew (kew@cl.uzh.ch)
+
+
+<!-- 
+
+## handy commands
+
+```
+python simplify_file.py \
+    /scratch/tkew/ctrl_tokens/resources/data/examples.en \
+    --out_path /scratch/tkew/ctrl_tokens/resources/data/examples.en.decoded \
+    --model_name muss_en_mined
+``` 
+
+-->

@@ -1,0 +1,3 @@
+[submodule "transformer-contributions-nmt"]
+	path = transformer-contributions-nmt
+	url = git@github.com:tannonk/transformer-contributions-nmt.git

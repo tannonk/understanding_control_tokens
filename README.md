@@ -30,7 +30,8 @@ conda create -n alti_plus python=3.8
 conda activate alti_plus
 pip install -r envs/alti_plus_requirements.txt
 ```
-Alternatively, could also try a single env (at own risk). Upgrading Fairseq doesn't seem to cause any issues when running inference with MUSS, however, this has not been thoroughly tested.
+
+<!-- Alternatively, could also try a single env (at own risk). Upgrading Fairseq doesn't seem to cause any issues when running inference with MUSS, however, this has not been thoroughly tested.
 
 ```
 conda create -n ctrl_tokens_v2 python=3.8
@@ -38,7 +39,7 @@ conda activate ctrl_tokens_v2
 pip install -r envs/alti_plus_requirements.txt
 pip install -r envs/ctrl_tokens_requirements.txt
 
-```
+``` -->
 
 ## Converting pretrained ACCESS/MUSS models to Hugging Face
 
@@ -97,16 +98,13 @@ python probe.py \
     --do_eval --do_predict
 ```
 
-### Attention Analysis
+### Control Token Contirbutions
 
-To analyse the contribution of control tokens via attention weights, we use the method proposed by [Ferrando et al. (2022)](https://arxiv.org/abs/2203.04212) called **ALTI+**.
+**ALTI+** [Ferrando et al. (2022)](https://arxiv.org/abs/2203.04212) was proposed to measure the *contributions* of source and prefix tokens on subsequent generation timesteps.
 
-The notebook [./transformer-contributions-nmt/muss_interprebility.ipynb] can be used to analyse attention weights in the custom BART model trained with Fairseq. 
+We consider this method to analyse the contribution of the MUSS model's control tokens.
 
-
-## Author
-
-Tannon Kew (kew@cl.uzh.ch)
+The notebook [./transformer-contributions-nmt/muss_interprebility.ipynb] can be used to analyse attention weights in the custom BART model trained with Fairseq.
 
 
 <!-- 

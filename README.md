@@ -58,9 +58,9 @@ The most obvious way to inspect the effect of the control tokens is to generate 
 
 We do this with both in-distribution and out-of-distribution control token values. If the control tokens do their job, we would expect to see the attributes of the generated outputs to reflect (or correlate strongly) with the specified values given as input to the model.
 
-To run these experiments, we provide the notebook [./notebooks/surface_level_analysis.ipynb](surface_level_analysis.ipynb) in which we construct a large inference dataset with input sentences hardcoded with a range of possible control token values and then generate simplifications using our Hugging Face ported model.
+To run these experiments, we provide the notebook [notebooks/surface_level_analysis.ipynb](surface_level_analysis.ipynb) in which we construct a large inference dataset with input sentences hardcoded with a range of possible control token values and then generate simplifications using our Hugging Face ported model.
 
-The correlation heatmaps in [./results/plots/] show that the correlation for in-domain parameter values and output attributes is low (~0.3) for three out of the four control tokens. This is similar to the preliminary results gained by Iza Škrjanec.
+The correlation heatmaps in [results/plots/] show that the correlation for in-domain parameter values and output attributes is low (~0.3) for three out of the four control tokens. This is similar to the preliminary results gained by Iza Škrjanec.
 
 ## Model Analysis
 
@@ -104,7 +104,7 @@ python probe.py \
 
 We consider this method to analyse the contribution of the MUSS model's control tokens.
 
-The notebook [./transformer-contributions-nmt/muss_interprebility.ipynb] can be used to analyse attention weights in the custom BART model trained with Fairseq.
+The notebook [transformer-contributions-nmt/muss_interprebility.ipynb] can be used to analyse attention weights in the custom BART model trained with Fairseq.
 
 
 <!-- 
